@@ -11,6 +11,7 @@ A compact **20 mm × 15 mm** 2.4 GHz ExpressLRS receiver designed around an **ES
 | MCU | ESP32-C3 |
 | RF transceiver | SX1281, 2.4 GHz |
 | Interface to flight controller | UART |
+| Status indicator | On-board RGB LED for receiver state |
 | Board size | 20 mm × 15 mm |
 | Design tool | EasyEDA |
 | PCB | Six layers |
@@ -30,7 +31,7 @@ The RF link terminates at the SX1281; the ESP32-C3 runs the receiver firmware an
 
 ## Firmware: VS Code + PlatformIO
 
-This custom receiver **was not flashed through ExpressLRS Configurator**: the board-specific DIY receiver is not listed there. I cloned the [ExpressLRS source repository](https://github.com/ExpressLRS/ExpressLRS), selected the **Generic ESP32-C3 2.4 GHz receiver** build, compiled it in **Visual Studio Code with the PlatformIO extension**, and flashed the receiver from that development workflow.
+This custom receiver **was not flashed through ExpressLRS Configurator**: the board-specific DIY receiver is not listed there. I cloned the [ExpressLRS source repository](https://github.com/ExpressLRS/ExpressLRS), selected the **Generic ESP32-C3 2.4 GHz receiver** build, compiled it in **Visual Studio Code with the PlatformIO extension**, and flashed the receiver using a **USB-to-UART converter**. The PCB has a **BOOT button** for entering the ESP32-C3 download mode.
 
 The tested receiver reported **ExpressLRS 4.1.0**, `UNIFIED_ESP32C3_2400_RX`, and an SX128X radio in its Web UI. The project artifacts include `AIRWINGS-ELRS-RX-4.1.0.bin` and `Generic-C3-2400-RX.json`. The Web UI's target identifier and the exact PlatformIO environment/task label can differ; select the task matching the ESP32-C3 **2.4 GHz RX** build in the source version you are using.
 
@@ -45,17 +46,35 @@ The tested receiver reported **ExpressLRS 4.1.0**, `UNIFIED_ESP32C3_2400_RX`, an
 
 3. In VS Code, open the cloned repository's **`src` directory** as a PlatformIO project (the directory containing its PlatformIO configuration). Choose the **Generic ESP32-C3 2.4 GHz RX** environment and review the user defines and hardware configuration for this board. Confirm the **SX1281/SX128X configuration, pin mapping, RF settings and UART pins** against the schematic and the board-specific JSON before building; the word *Generic* does not guarantee a correct pin map for another PCB.
 4. Open **PlatformIO → Project Tasks → selected receiver environment → Build**. Wait for a successful build before connecting the board for flashing.
-5. Connect the board using its actual programming interface and correct voltage. Select the corresponding serial port in PlatformIO. If the custom ESP32-C3 board has no automatic boot circuit, hold **GPIO9 low during reset** to enter its serial bootloader; **GPIO8 must be high** for reliable download mode. Then use that environment's **Upload** task. Follow the schematic for the physical programming pads and reset method; do not follow older ESP8285 DIY instructions that say to pull IO0 low.
-6. Reset into normal boot, check the reported firmware/target in the Web UI, bind with a compatible ExpressLRS transmitter, and verify channel movement on the flight controller before flight.
+5. Connect a **USB-to-UART converter** to the receiver's programming pads: converter **TX → receiver RX**, converter **RX → receiver TX**, and **GND → GND**. Power the receiver as specified by the schematic and use **3.3 V logic levels** at the ESP32-C3 UART. Check whether the converter should also supply power to this PCB before connecting its VCC pin; do not connect two power sources blindly.
+6. Hold the receiver's **BOOT button** and reset or power-cycle the board so the ESP32-C3 enters download mode, then release BOOT. Select the converter's COM/serial port and use the selected PlatformIO receiver environment's **Upload** task. On the ESP32-C3, download mode normally uses **GPIO9 low at reset** and **GPIO8 high**; consult the board schematic if the button or strap wiring differs. Older ESP8285 DIY instructions that pull IO0 low do not describe the ESP32-C3 boot pins.
+7. After upload, disconnect the flashing setup as appropriate, reset into normal boot without holding BOOT, check the reported firmware/target in the Web UI, bind with a compatible ExpressLRS transmitter, and verify channel movement on the flight controller before flight.
 
-The [ExpressLRS source-build guide](https://www.expresslrs.org/software/toolchain-install/) documents cloning, user defines, and PlatformIO Build/Upload tasks. [Espressif's ESP32-C3 boot-mode guide](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/boot-mode-selection.html) explains the GPIO9/GPIO8 requirements. The precise upload connection for **this PCB** must match its schematic.
+The [ExpressLRS source-build guide](https://www.expresslrs.org/software/toolchain-install/) documents cloning, user defines, and PlatformIO Build/Upload tasks. [Espressif's ESP32-C3 boot-mode guide](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/boot-mode-selection.html) explains the GPIO9/GPIO8 requirements. Use this PCB's schematic for the exact BOOT, UART and power-pad locations.
+
+## RGB LED status
+
+The receiver has an **RGB status LED**. With an ExpressLRS receiver build configured for this LED, the [official ExpressLRS receiver RGB LED guide](https://www.expresslrs.org/quick-start/led-status/) describes these patterns:
+
+| RGB LED indication | Receiver state |
+| --- | --- |
+| Rainbow fade | Starting up |
+| Slow blink (about 500 ms on/off) | Waiting for a transmitter |
+| Orange double blink, then pause | Binding mode |
+| Orange triple blink, then pause | Connected, but model-match settings differ |
+| Solid single color | Connected; color indicates the selected packet rate |
+| Green heartbeat | Web update mode |
+| Rapid red flashing | Radio chip not detected |
+| No light | Powered off or in bootloader mode |
+
+The [same guide](https://www.expresslrs.org/quick-start/led-status/) lists the **2.4 GHz packet-rate color mapping**. These are ExpressLRS firmware indications; check the board's RGB LED wiring and target configuration if its behavior differs.
 
 The **same physical PCB** was also reconfigured and flashed for transmitter/telemetry experiments. This was a firmware/configuration reuse of the receiver hardware, not a redesigned telemetry PCB. Receiver operation on the drone does not by itself establish validated transmitter performance.
 
 ## Test status
 
 - Custom board assembled and powered up.
-- ExpressLRS source cloned, Generic ESP32-C3 2.4 GHz RX firmware built with PlatformIO in VS Code, flashed, and receiver configuration checked.
+- ExpressLRS source cloned, Generic ESP32-C3 2.4 GHz RX firmware built with PlatformIO in VS Code, flashed through a USB-to-UART converter using the board's BOOT button, and receiver configuration checked.
 - Receiver function tested with a drone installation.
 
 Detailed RF range, sensitivity, packet-loss and compliance figures have not been provided. Add reproducible measurements and test conditions if those are evaluated later.
