@@ -28,23 +28,34 @@ flowchart LR
 
 The RF link terminates at the SX1281; the ESP32-C3 runs the receiver firmware and communicates with the flight controller over UART. Check the schematic for the exact voltage, pads and pin assignments before wiring the board.
 
-## Firmware and bring-up
+## Firmware: VS Code + PlatformIO
 
-The tested receiver configuration used **ExpressLRS 4.1.0** with the **Generic ESP32-C3 2.4 GHz RX / `UNIFIED_ESP32C3_2400_RX`** target and SX128X radio family, as shown in the project's configuration evidence. The firmware artifacts previously prepared for this board include `AIRWINGS-ELRS-RX-4.1.0.bin` and `Generic-C3-2400-RX.json`; use the configuration matching your hardware revision.
+This custom receiver **was not flashed through ExpressLRS Configurator**: the board-specific DIY receiver is not listed there. I cloned the [ExpressLRS source repository](https://github.com/ExpressLRS/ExpressLRS), selected the **Generic ESP32-C3 2.4 GHz receiver** build, compiled it in **Visual Studio Code with the PlatformIO extension**, and flashed the receiver from that development workflow.
 
-For a new build or reflash:
+The tested receiver reported **ExpressLRS 4.1.0**, `UNIFIED_ESP32C3_2400_RX`, and an SX128X radio in its Web UI. The project artifacts include `AIRWINGS-ELRS-RX-4.1.0.bin` and `Generic-C3-2400-RX.json`. The Web UI's target identifier and the exact PlatformIO environment/task label can differ; select the task matching the ESP32-C3 **2.4 GHz RX** build in the source version you are using.
 
-1. Confirm the board's power, UART wiring, boot method and RF antenna connection from the schematic.
-2. Select the correct ExpressLRS receiver target and board configuration. Follow the [official ExpressLRS documentation](https://www.expresslrs.org/) for the flashing method supported by that firmware version.
-3. Check that the receiver starts, shows the expected device/target information and binds to a compatible transmitter.
-4. Connect the UART to a flight-controller UART, configure the matching serial receiver protocol in the flight-controller software, and verify channel movement before flight.
+### Rebuild and flash
+
+1. Install **Git**, [Visual Studio Code](https://code.visualstudio.com/) and the [PlatformIO IDE extension](https://docs.platformio.org/en/latest/integration/ide/vscode.html).
+2. Clone the upstream source. To reproduce the tested firmware, select the matching **4.1.0 release source** rather than building an arbitrary newer revision:
+
+   ```bash
+   git clone https://github.com/ExpressLRS/ExpressLRS.git
+   ```
+
+3. In VS Code, open the cloned repository's **`src` directory** as a PlatformIO project (the directory containing its PlatformIO configuration). Choose the **Generic ESP32-C3 2.4 GHz RX** environment and review the user defines and hardware configuration for this board. Confirm the **SX1281/SX128X configuration, pin mapping, RF settings and UART pins** against the schematic and the board-specific JSON before building; the word *Generic* does not guarantee a correct pin map for another PCB.
+4. Open **PlatformIO → Project Tasks → selected receiver environment → Build**. Wait for a successful build before connecting the board for flashing.
+5. Connect the board using its actual programming interface and correct voltage. Select the corresponding serial port in PlatformIO. If the custom ESP32-C3 board has no automatic boot circuit, hold **GPIO9 low during reset** to enter its serial bootloader; **GPIO8 must be high** for reliable download mode. Then use that environment's **Upload** task. Follow the schematic for the physical programming pads and reset method; do not follow older ESP8285 DIY instructions that say to pull IO0 low.
+6. Reset into normal boot, check the reported firmware/target in the Web UI, bind with a compatible ExpressLRS transmitter, and verify channel movement on the flight controller before flight.
+
+The [ExpressLRS source-build guide](https://www.expresslrs.org/software/toolchain-install/) documents cloning, user defines, and PlatformIO Build/Upload tasks. [Espressif's ESP32-C3 boot-mode guide](https://docs.espressif.com/projects/esptool/en/latest/esp32c3/advanced-topics/boot-mode-selection.html) explains the GPIO9/GPIO8 requirements. The precise upload connection for **this PCB** must match its schematic.
 
 The **same physical PCB** was also reconfigured and flashed for transmitter/telemetry experiments. This was a firmware/configuration reuse of the receiver hardware, not a redesigned telemetry PCB. Receiver operation on the drone does not by itself establish validated transmitter performance.
 
 ## Test status
 
 - Custom board assembled and powered up.
-- ExpressLRS firmware flashed and receiver configuration checked.
+- ExpressLRS source cloned, Generic ESP32-C3 2.4 GHz RX firmware built with PlatformIO in VS Code, flashed, and receiver configuration checked.
 - Receiver function tested with a drone installation.
 
 Detailed RF range, sensitivity, packet-loss and compliance figures have not been provided. Add reproducible measurements and test conditions if those are evaluated later.
